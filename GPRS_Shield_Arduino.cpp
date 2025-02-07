@@ -271,7 +271,7 @@ bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, cha
         // If there is no name in phonebook return false
         if(p == p2){
           return false;
-        } 
+        }
         if (NULL != p) {
             i = 0;
             while (p2 < p) {
@@ -487,13 +487,13 @@ bool GPRS::isCallActive(char* number, char* name) {
                         }
                         name[i] = '\0';
                     } else {
-                        return false; // Failed to find end of name
+                        name[0] = '\0'; // Failed to find end of name
                     }
                 } else {
                     return false;
                 }
                 return true;
-            }
+            } 
         }
     }
     return false;
