@@ -647,6 +647,33 @@ bool GPRS::cancelUSSDSession(void) {
     return sim900_check_with_cmd(F("AT+CUSD=2\r\n"), "OK\r\n", CMD);
 }
 
+bool GPRS::getBookStorage(int *buffer2)
+{
+  byte i = 0;
+  char gprsBuffer[35];
+  char *p, *s;
+  char buffers[4];
+  sim900_flush_serial();
+  sim900_send_cmd(F("AT+CPBS?\r"));
+  sim900_clean_buffer(gprsBuffer, 35);
+  sim900_read_buffer(gprsBuffer, 35, DEFAULT_TIMEOUT);
+  if (NULL != (s = strstr(gprsBuffer, "+CPBS:"))) {
+    s = strstr((char *)(s), ",");
+    s = s + 1;  //We are in the first phone number character 
+    p = strstr((char *)(s), ","); //p is last character """
+    if (NULL != s) {
+      i = 0;
+      while (s < p) {
+        buffers[i++] = *(s++);
+      }
+      buffers[i] = '\0';
+    }
+    *buffer2 = atoi(buffers);
+    return true;
+  }
+  return false;
+}
+
 bool GPRS::getBookEntry(int index, char* number, int* type, char* name) {
 
     //AT+GPBR=? 		=>		+CPBR:(1-250),40,17		+CPBR: (range phone book),number length, name length

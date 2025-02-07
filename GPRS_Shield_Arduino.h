@@ -250,6 +250,13 @@ class GPRS {
     */
     bool cancelUSSDSession(void);
 
+    /** Retrieves the amount of used phonebook registers
+     *  @returns
+     *      true on success 
+     *      false on error because of storage error
+     */
+    bool getBookStorage(int *buffer);
+
     /** Get number and name from the phone book
         @param  index	phone book position
         @param  number	buffer used to get the number
