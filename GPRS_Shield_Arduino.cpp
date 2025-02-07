@@ -221,7 +221,7 @@ char GPRS::isSMSunread() {
     return -1;
 }
 
-bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, char* datetime) {
+bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, char* name, char* datetime) {
     /*  Response is like:
         AT+CMGR=2
 
@@ -263,6 +263,21 @@ bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, cha
                 phone[i++] = *(p2++);
             }
             phone[i] = '\0';
+        }
+        // Extract phonebook name string
+        p = strstr((char*)(p2), ",");
+        p2 = p + 2; //We are in the first phonebook name character
+        p = strstr((char*)(p2), "\"");
+        // If there is no name in phonebook return false
+        if(p == p2){
+          return false;
+        } 
+        if (NULL != p) {
+            i = 0;
+            while (p2 < p) {
+                name[i++] = *(p2++);
+            }
+            name[i] = '\0';
         }
         // Extract date time string
         p = strstr((char*)(p2), ",");
@@ -396,7 +411,7 @@ bool GPRS::getSubscriberNumber(char* number) {
     return false;
 }
 
-bool GPRS::isCallActive(char* number) {
+bool GPRS::isCallActive(char* number, char* name) {
     char gprsBuffer[64];  //46 is enough to see +CPAS: and CLCC:
     char* p, *s;
     int i = 0;
@@ -460,6 +475,19 @@ bool GPRS::isCallActive(char* number) {
                             number[i++] = *(s++);
                         }
                         number[i] = '\0';
+                    }
+                    // Continue reading buffer for contact's name
+                    s = strstr((char*)(p + 1), "\"");
+                    s = s + 1; // Move to start of name
+                    p = strstr((char*)(s), "\""); // Find end of name
+                    if (p != NULL) {
+                        i = 0;
+                        while (s < p ) {
+                            name[i++] = *(s++);
+                        }
+                        name[i] = '\0';
+                    } else {
+                        return false; // Failed to find end of name
                     }
                 } else {
                     return false;
@@ -617,6 +645,33 @@ bool GPRS::sendUSSDSynchronous(char* ussdCommand, char* resultcode, char* respon
 
 bool GPRS::cancelUSSDSession(void) {
     return sim900_check_with_cmd(F("AT+CUSD=2\r\n"), "OK\r\n", CMD);
+}
+
+bool GPRS::getBookStorage(int *buffer2)
+{
+  byte i = 0;
+  char gprsBuffer[35];
+  char *p, *s;
+  char buffers[4];
+  sim900_flush_serial();
+  sim900_send_cmd(F("AT+CPBS?\r"));
+  sim900_clean_buffer(gprsBuffer, 35);
+  sim900_read_buffer(gprsBuffer, 35, DEFAULT_TIMEOUT);
+  if (NULL != (s = strstr(gprsBuffer, "+CPBS:"))) {
+    s = strstr((char *)(s), ",");
+    s = s + 1;  //We are in the first phone number character 
+    p = strstr((char *)(s), ","); //p is last character """
+    if (NULL != s) {
+      i = 0;
+      while (s < p) {
+        buffers[i++] = *(s++);
+      }
+      buffers[i] = '\0';
+    }
+    *buffer2 = atoi(buffers);
+    return true;
+  }
+  return false;
 }
 
 bool GPRS::getBookEntry(int index, char* number, int* type, char* name) {

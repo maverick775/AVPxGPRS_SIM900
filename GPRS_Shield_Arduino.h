@@ -120,12 +120,13 @@ class GPRS {
         @param  message  buffer used to get SMS message
         @param  length  length of message buffer
         @param  phone  buffer used to get SMS's sender phone number
+        @param  name  buffer used to get SMS's sender name
         @param  datetime  buffer used to get SMS's send datetime
         @returns
             true on success
             false on error
     */
-    bool readSMS(int messageIndex, char* message, int length, char* phone, char* datetime);
+    bool readSMS(int messageIndex, char* message, int length, char* phone, char *name, char* datetime);
 
     /** read SMS if getting a SMS message
         @param  buffer  buffer that get from GPRS module(when getting a SMS, GPRS module will return a buffer array)
@@ -187,12 +188,12 @@ class GPRS {
     */
     bool getSubscriberNumber(char* number);
 
-    /** Check if there is a call active and get the phone number in that case
+    /** Check if there is a user call active and get the phone number in that case
         @returns
             true on success
             false on error
     */
-    bool isCallActive(char* number);
+    bool isCallActive(char* number, char* name);
 
     /** get DateTime from SIM900 (see AT command: AT+CLTS=1) as string
         @param
@@ -248,6 +249,13 @@ class GPRS {
             false on error or because no active session
     */
     bool cancelUSSDSession(void);
+
+    /** Retrieves the amount of used phonebook registers
+     *  @returns
+     *      true on success 
+     *      false on error because of storage error
+     */
+    bool getBookStorage(int *buffer);
 
     /** Get number and name from the phone book
         @param  index	phone book position
