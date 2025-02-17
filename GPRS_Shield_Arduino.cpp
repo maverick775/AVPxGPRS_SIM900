@@ -89,6 +89,23 @@ void GPRS::powerReset(uint8_t pin) {
     delay(3000);
 }
 
+bool GPRS::sendAT(const char* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3) {
+    while (retryCount > 0) {
+        // Send the custom AT command
+        sim900_send_cmd("AT+");
+        sim900_send_cmd(command);
+        sim900_send_cmd("\r\n");
+
+        // Wait for the OK response
+        if (sim900_wait_for_resp("OK\r\n", CMD, timeout)) {
+            return true; // Response contains "OK"
+        }
+
+        retryCount--;
+    }
+
+    return false; // Response does not contain "OK"
+}
 
 bool GPRS::checkSIMStatus(void) {
     char gprsBuffer[32];

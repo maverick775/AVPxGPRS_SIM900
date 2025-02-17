@@ -86,6 +86,16 @@ class GPRS {
 
     */
     void powerReset(uint8_t pin);
+
+    /** send AT command
+     *  @param  command AT command
+     *  @param  timeout timeout for AT command - Defaults to 5s
+     *  @param  retryCount retry count for AT command - Defaults to 3
+     *  @returns
+     *      true on success
+     *      false on error
+     */
+    bool GPRS::sendAT(const char* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3);
     /** Check network registration status
         @return true on success, false on fail
     */
