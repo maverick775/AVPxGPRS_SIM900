@@ -89,6 +89,29 @@ void GPRS::powerReset(uint8_t pin) {
     delay(3000);
 }
 
+bool GPRS::testAT(unsigned int timeout = DEFAULT_TIMEOUT * 1000) {
+    unsigned long startTime = millis();
+    while (millis() - startTime < timeout) {
+        // Send the "AT" command
+        sim900_send_cmd("AT\r\n");
+
+        // Read the response buffer
+        char gprsBuffer[128];
+        sim900_clean_buffer(gprsBuffer, sizeof(gprsBuffer));
+        sim900_read_buffer(gprsBuffer, sizeof(gprsBuffer), 500);
+
+        // Check if the response buffer contains "OK"
+        if (strstr(gprsBuffer, "OK\r\n") != NULL) {
+            return true; // Response contains "OK"
+        }
+
+        // If the response buffer contains something else, try again
+        delay(500);
+    }
+
+    return false; // Timeout reached without receiving "OK"
+}
+
 bool GPRS::sendAT(const char* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3) {
     while (retryCount > 0) {
         // Send the custom AT command
