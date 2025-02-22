@@ -112,7 +112,7 @@ bool GPRS::testAT(unsigned int timeout = DEFAULT_TIMEOUT * 1000) {
     return false; // Timeout reached without receiving "OK"
 }
 
-bool GPRS::sendAT(const char* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3) {
+bool GPRS::sendAT_CMD(const char* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3) {
     while (retryCount > 0) {
         // Send the custom AT command
         sim900_send_cmd(F("AT+"));
@@ -130,7 +130,7 @@ bool GPRS::sendAT(const char* command, unsigned int timeout = DEFAULT_TIMEOUT, u
     return false; // Response does not contain "OK"
 }
 
-bool GPRS::sendAT(const __FlashStringHelper* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3) {
+bool GPRS::sendAT_CMD(const __FlashStringHelper* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3) {
     while (retryCount > 0) {
         // Send the custom AT command
         sim900_send_cmd(F("AT+"));
