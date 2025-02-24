@@ -257,6 +257,10 @@ class GPRS {
      */
     bool getBookStorage(int *buffer);
 
+    //TODO: Create function for finding phonebook entry based on name
+    // @returns phonebook index or -1 if not found
+    char findContactByName(char* name, char* number);
+
     /** Get number and name from the phone book
         @param  index	phone book position
         @param  number	buffer used to get the number

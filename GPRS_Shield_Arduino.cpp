@@ -674,6 +674,48 @@ bool GPRS::getBookStorage(int *buffer2)
   return false;
 }
 
+char GPRS::findContactByName(char* name, char* number) {
+    char gprsBuffer[100];
+    char* beg, *end, *idx, *num, *typ;
+
+    sim900_send_cmd(F("AT+CPBF=\""));
+    sim900_send_cmd(name);
+    sim900_send_cmd(F("\"\r\n"));
+
+    sim900_clean_buffer(gprsBuffer, sizeof(gprsBuffer));
+    sim900_read_buffer(gprsBuffer, sizeof(gprsBuffer), DEFAULT_TIMEOUT);
+
+    if (NULL == (beg = strstr(gprsBuffer, "+CPBF: "))) {
+        return -1;
+    }
+
+    if (NULL == (end = strstr(beg, "\r\n"))) {
+        return -1;
+    }
+
+    if (NULL == (idx = strchr(beg, ','))) {
+        return -1;
+    }
+    
+    char tmp[4];
+    strncpy(tmp, beg + 7, (idx - (beg + 7)) <= 3 ? (idx - (beg + 7)) : 3);
+    tmp[(idx - (beg + 7)) <= 3 ? (idx - (beg + 7)) : 3] = '\0';
+
+    if (NULL == (num = strchr(idx + 1, ','))) {
+        return -1;
+    }
+
+    idx = idx + 2; // Move past the initial quote
+    if (NULL == (typ = strchr(num + 1, ','))) {
+        return -1;
+    }
+
+    strncpy(number, idx, (num - idx) <= 40 ? (num - idx) : 40);
+    number[(num - idx) <= 40 ? (num - idx) : 40] = '\0';
+
+    return strtol(tmp, NULL, 10);
+}
+
 bool GPRS::getBookEntry(int index, char* number, int* type, char* name) {
 
     //AT+GPBR=? 		=>		+CPBR:(1-250),40,17		+CPBR: (range phone book),number length, name length
