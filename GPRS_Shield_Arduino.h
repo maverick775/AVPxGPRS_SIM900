@@ -72,14 +72,6 @@ class GPRS {
     */
     bool checkPowerUp(void);
 
-    /** Test communication with GPRS module
-        @param  timeout timeout for AT command - Defaults to 5s
-        @returns
-            true on OK response
-            false on error or timeout
-    */
-    bool GPRS::testAT(unsigned int timeout);
-
     /** power Up GPRS module (JP has to be soldered)
         @param  pin pin 9 connected to JP jumper so we can power up and down through software
         @returns
