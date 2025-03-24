@@ -67,7 +67,6 @@ bool GPRS::init(void) {
 
 bool GPRS::checkPowerUp(void) {
     return sim900_check_with_cmd(F("AT\r\n"), "OK\r\n", CMD);
-    //We dont need here any pin, as this library has to work also with SIM800L
 }
 
 void GPRS::powerUpDown(uint8_t pin) {
@@ -89,6 +88,41 @@ void GPRS::powerReset(uint8_t pin) {
     delay(3000);
 }
 
+bool GPRS::sendAT_CMD(const char* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3) {
+    while (retryCount > 0) {
+        // Send the custom AT command
+        sim900_send_cmd(F("AT+"));
+        sim900_send_cmd_P(command);
+        sim900_send_cmd(F("\r\n"));
+
+        // Wait for the OK response
+        if (sim900_wait_for_resp("OK\r\n", CMD, timeout)) {
+            return true; // Response contains "OK"
+        }
+
+        retryCount--;
+    }
+
+    return false; // Response does not contain "OK"
+}
+
+bool GPRS::sendAT_CMD(const __FlashStringHelper* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3) {
+    while (retryCount > 0) {
+        // Send the custom AT command
+        sim900_send_cmd(F("AT+"));
+        sim900_send_cmd(command);
+        sim900_send_cmd(F("\r\n"));
+
+        // Wait for the OK response
+        if (sim900_wait_for_resp("OK\r\n", CMD, timeout)) {
+            return true; // Response contains "OK"
+        }
+
+        retryCount--;
+    }
+
+    return false; // Response does not contain "OK"
+}
 
 bool GPRS::checkSIMStatus(void) {
     char gprsBuffer[32];
