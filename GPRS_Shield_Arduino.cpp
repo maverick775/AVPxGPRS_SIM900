@@ -722,7 +722,7 @@ int GPRS::findContactByName(const char* searchName, int* index, char* number, ch
                         char tmpName[16] = {0};
                         
                         // Parse entry: +CPBF: <index>,"<number>",<type>,"<name>"
-                        if (sscanf(line, "+CPBF: %d,\"%24[^\"]\",%*d,\"%39[^\"]\"",
+                        if (sscanf(line, "+CPBF: %d,\"%14[^\"]\",%*d,\"%14[^\"]\"",
                                   &tmpIndex, tmpNumber, tmpName) == 3) {
                             *index = tmpIndex;
                             strcpy(number, tmpNumber);
