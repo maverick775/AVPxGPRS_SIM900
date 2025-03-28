@@ -274,11 +274,12 @@ class GPRS {
      * 
      * @param searchName    Name to search for in the phonebook
      * @param index         Pointer to store the index of the first match
-     * @param number        Pointer to store the phone number of the first match
-     * @param name          Pointer to store the name of the first match
+     * @param number        Pointer to store the phone number (size 16)
+     * @param name          Pointer to store the name (size 16)
+     * @param timeout       Timeout in seconds for the operation (default: 5)
      * @return              -1 if error, 0 if no match, 1 if exactly one match, 2 if multiple matches
      */
-    int findContactByName(const char* searchName, int* index, char* number, char* name);
+    int findContactByName(const char* searchName, int* index, char* number, char* name, unsigned int timeout);
 
     /** Get number and name from the phone book
         @param  index	phone book position

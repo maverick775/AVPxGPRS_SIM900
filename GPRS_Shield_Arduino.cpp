@@ -708,14 +708,19 @@ bool GPRS::getBookStorage(int *buffer2)
   return false;
 }
 
-int GPRS::findContactByName(const char* searchName, int* index, char* number, char* name) {
-    char cmd[64];
-    char buffer[128];
-    int matchCount = 0;
-    bool firstEntryFound = false;
-    
-    // Ensure pointers are valid
-    if (!index || !number || !name) {
+/**
+ * Find a contact in the phonebook by name
+ * 
+ * @param searchName    Name to search for in the phonebook
+ * @param index         Pointer to store the index of the first match
+ * @param number        Pointer to store the phone number (size 16)
+ * @param name          Pointer to store the name (size 16)
+ * @param timeout       Timeout in seconds for the operation (default: 5)
+ * @return              -1 if error, 0 if no match, 1 if exactly one match, 2 if multiple matches
+ */
+int GPRS::findContactByName(const char* searchName, int* index, char* number, char* name, unsigned int timeout) {
+    // Validate input parameters
+    if (!index || !number || !name || !searchName) {
         return -1;
     }
     
@@ -724,26 +729,30 @@ int GPRS::findContactByName(const char* searchName, int* index, char* number, ch
     number[0] = '\0';
     name[0] = '\0';
     
-    // Build AT command
-    snprintf(cmd, sizeof(cmd), "AT+CPBF=\"%s\"\r\n", searchName);
+    char buffer[128]; // Buffer for response
+    int matchCount = 0;
+    bool firstEntryFound = false;
     
-    // Send command
-    if (!sendAT_CMD(cmd)) {
-        return -1;
-    }
-
-    unsigned long timeout = millis() + 5000; // 5-second timeout
-    while (millis() < timeout) {
-        if (gprsSerial.available()) {
-            int len = readBuffer(buffer, sizeof(buffer)-1);
+    // Send AT+CPBF command
+    sim900_flush_serial();
+    sim900_send_cmd(F("AT+CPBF=\""));
+    sim900_send_cmd(searchName);
+    sim900_send_cmd(F("\"\r\n"));
+    
+    // Wait for response with timeout
+    unsigned long startTime = millis();
+    while ((millis() - startTime) < (timeout * 1000UL)) {
+        if (sim900_check_readable()) {
+            sim900_clean_buffer(buffer, sizeof(buffer));
+            int len = sim900_read_buffer(buffer, sizeof(buffer) - 1);
             buffer[len] = '\0';
-
+            
             // Check for error
-            if (strstr(buffer, "ERROR")) {
+            if (strstr(buffer, "ERROR") != NULL) {
                 return -1;
             }
-
-            // Process each line in the response
+            
+            // Process response to find +CPBF: entries
             char* line = strtok(buffer, "\r\n");
             while (line != NULL) {
                 if (strstr(line, "+CPBF:") != NULL) {
@@ -755,26 +764,116 @@ int GPRS::findContactByName(const char* searchName, int* index, char* number, ch
                         char tmpNumber[16] = {0};
                         char tmpName[16] = {0};
                         
-                        // Parse entry: +CPBF: <index>,"<number>",<type>,"<name>"
-                        if (sscanf(line, "+CPBF: %d,\"%14[^\"]\",%*d,\"%14[^\"]\"",
-                                  &tmpIndex, tmpNumber, tmpName) == 3) {
+                        // Parse entry - limit to 15 chars to allow null termination in 16-byte arrays
+                        if (sscanf(line, "+CPBF: %d,\"%15[^\"]\",%*d,\"%15[^\"]\"",
+                                 &tmpIndex, tmpNumber, tmpName) == 3) {
                             *index = tmpIndex;
-                            strcpy(number, tmpNumber);
-                            strcpy(name, tmpName);
+                            strncpy(number, tmpNumber, 15);
+                            number[15] = '\0';  // Ensure null termination
+                            strncpy(name, tmpName, 15);
+                            name[15] = '\0';    // Ensure null termination
                             firstEntryFound = true;
                         }
                     }
                 }
                 line = strtok(NULL, "\r\n");
             }
-
+            
             // Check for completion
-            if (strstr(buffer, "OK")) {
+            if (strstr(buffer, "OK") != NULL) {
                 break;
             }
         }
     }
+    
+    // If timed out without finding "OK"
+    if ((millis() - startTime) >= (timeout * 1000UL) && !firstEntryFound) {
+        return -1;  // Error or timeout
+    }
+    
+    // Return appropriate result code
+    if (matchCount == 0) {
+        return 0;  // No contacts found
+    } else if (matchCount == 1) {
+        return 1;  // Exactly one match
+    } else {
+        return 2;  // Multiple matches
+    }
+}
 
+int GPRS::findContactByName(const char* searchName, int* index, char* number, char* name, unsigned int timeout) {
+    // Validate input parameters
+    if (!index || !number || !name || !searchName) {
+        return -1;
+    }
+    
+    // Initialize output parameters
+    *index = -1;
+    number[0] = '\0';
+    name[0] = '\0';
+    
+    char buffer[128]; // Buffer for response
+    int matchCount = 0;
+    bool firstEntryFound = false;
+    
+    // Send AT+CPBF command
+    sim900_flush_serial();
+    sim900_send_cmd(F("AT+CPBF=\""));
+    sim900_send_cmd(searchName);
+    sim900_send_cmd(F("\"\r\n"));
+    
+    // Wait for response with timeout
+    unsigned long startTime = millis();
+    while ((millis() - startTime) < (timeout * 1000UL)) {
+        if (sim900_check_readable()) {
+            sim900_clean_buffer(buffer, sizeof(buffer));
+            int len = sim900_read_buffer(buffer, sizeof(buffer) - 1);
+            buffer[len] = '\0';
+            
+            // Check for error
+            if (strstr(buffer, "ERROR") != NULL) {
+                return -1;
+            }
+            
+            // Process response to find +CPBF: entries
+            char* line = strtok(buffer, "\r\n");
+            while (line != NULL) {
+                if (strstr(line, "+CPBF:") != NULL) {
+                    matchCount++;
+                    
+                    // Store first match details
+                    if (!firstEntryFound) {
+                        int tmpIndex;
+                        char tmpNumber[16] = {0};
+                        char tmpName[16] = {0};
+                        
+                        // Parse entry - limit to 15 chars to allow null termination in 16-byte arrays
+                        if (sscanf(line, "+CPBF: %d,\"%15[^\"]\",%*d,\"%15[^\"]\"",
+                                 &tmpIndex, tmpNumber, tmpName) == 3) {
+                            *index = tmpIndex;
+                            strncpy(number, tmpNumber, 15);
+                            number[15] = '\0';  // Ensure null termination
+                            strncpy(name, tmpName, 15);
+                            name[15] = '\0';    // Ensure null termination
+                            firstEntryFound = true;
+                        }
+                    }
+                }
+                line = strtok(NULL, "\r\n");
+            }
+            
+            // Check for completion
+            if (strstr(buffer, "OK") != NULL) {
+                break;
+            }
+        }
+    }
+    
+    // If timed out without finding "OK"
+    if ((millis() - startTime) >= (timeout * 1000UL) && !firstEntryFound) {
+        return -1;  // Error or timeout
+    }
+    
     // Return appropriate result code
     if (matchCount == 0) {
         return 0;  // No contacts found
