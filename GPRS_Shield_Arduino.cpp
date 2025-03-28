@@ -708,6 +708,82 @@ bool GPRS::getBookStorage(int *buffer2)
   return false;
 }
 
+int GPRS::findContactByName(const char* searchName, int* index, char* number, char* name, unsigned int timeout) {
+    // Validate input parameters
+    if (!searchName || !index || !number || !name) {
+        return -1;
+    }
+    
+    // Initialize output parameters
+    *index = -1;
+    number[0] = '\0';
+    name[0] = '\0';
+    
+    char gprsBuffer[128];
+    int matchCount = 0;
+    bool firstEntryFound = false;
+    
+    sim900_flush_serial();
+    sim900_send_cmd(F("AT+CPBF=\""));
+    sim900_send_cmd(searchName);
+    sim900_send_cmd(F("\"\r\n"));
+    
+    unsigned long stopTime = millis() + (timeout * 1000UL);
+    
+    // Loop until either "OK" is detected in the response or we time out
+    while (millis() < stopTime) {
+        if (sim900_check_readable() > 0) {
+            sim900_clean_buffer(gprsBuffer, sizeof(gprsBuffer));
+            sim900_read_buffer(gprsBuffer, sizeof(gprsBuffer), DEFAULT_TIMEOUT, DEFAULT_INTERCHAR_TIMEOUT);
+            // If the response contains an error, return -1
+            if (strstr(gprsBuffer, "ERROR") != NULL) {
+                return -1;
+            }
+            
+            // Process each line from the received buffer
+            char* line = strtok(gprsBuffer, "\r\n");
+            while (line != NULL) {
+                if (strstr(line, "+CPBF:") != NULL) {
+                    matchCount++;
+                    if (!firstEntryFound) {
+                        int tmpIndex;
+                        char tmpNumber[16] = {0};
+                        char tmpName[16] = {0};
+                        // Expected format: +CPBF: <index>,"<number>",<type>,"<name>"
+                        if (sscanf(line, "+CPBF: %d,\"%15[^\"]\",%*d,\"%15[^\"]\"", &tmpIndex, tmpNumber, tmpName) == 3) {
+                            *index = tmpIndex;
+                            strncpy(number, tmpNumber, 16);
+                            strncpy(name, tmpName, 16);
+                            firstEntryFound = true;
+                        }
+                    }
+                }
+                // Process the next line in the buffer
+                line = strtok(NULL, "\r\n");
+            }
+            // If the response includes "OK", consider the command fully processed
+            if (strstr(gprsBuffer, "OK") != NULL) {
+                break;
+            }
+        }
+    }
+    
+    // If timeout occurred and "OK" was not found, return an error
+    if (millis() >= stopTime && strstr(gprsBuffer, "OK") == NULL) {
+        return -1;
+    }
+    
+    // Return a code based on the number of matching entries found
+    if (matchCount == 0) {
+        return 0;
+    } else if (matchCount == 1) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+
 bool GPRS::getBookEntry(int index, char* number, int* type, char* name) {
 
     //AT+GPBR=? 		=>		+CPBR:(1-250),40,17		+CPBR: (range phone book),number length, name length
