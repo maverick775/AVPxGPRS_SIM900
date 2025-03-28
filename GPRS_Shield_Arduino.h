@@ -72,7 +72,6 @@ class GPRS {
     */
     bool checkPowerUp(void);
 
-
     /** power Up GPRS module (JP has to be soldered)
         @param  pin pin 9 connected to JP jumper so we can power up and down through software
         @returns
@@ -86,6 +85,19 @@ class GPRS {
 
     */
     void powerReset(uint8_t pin);
+
+    /** send AT command
+     *  @param  command AT command
+     *  @param  timeout timeout for AT command - Defaults to 5s
+     *  @param  retryCount retry count for AT command - Defaults to 3
+     *  @returns
+     *      true on success
+     *      false on error
+     */
+    bool GPRS::sendAT_CMD(const char* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3);
+    
+    bool GPRS::sendAT_CMD(const __FlashStringHelper* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3);
+    
     /** Check network registration status
         @return true on success, false on fail
     */
