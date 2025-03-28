@@ -279,7 +279,7 @@ class GPRS {
      * @param timeout       Timeout in seconds for the operation (default: 5)
      * @return              -1 if error, 0 if no match, 1 if exactly one match, 2 if multiple matches
      */
-    int findContactByName(const char* searchName, int* index, char* number, char* name, unsigned int timeout);
+    int findContactByName(const char* searchName, int* index, char* number, char* name, unsigned int timeout = 5);
 
     /** Get number and name from the phone book
         @param  index	phone book position
