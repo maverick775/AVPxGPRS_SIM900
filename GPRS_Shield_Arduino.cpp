@@ -715,13 +715,14 @@ int GPRS::findContactByName(const char* searchName, int* index, char* number, ch
     }
     
     // Initialize output parameters
-    *index = -1;
+    *index = 0;
     number[0] = '\0';
     name[0] = '\0';
     
     char gprsBuffer[128];
     int matchCount = 0;
     bool firstEntryFound = false;
+    bool okReceived = false;
     
     sim900_flush_serial();
     sim900_send_cmd(F("AT+CPBF=\""));
@@ -735,14 +736,21 @@ int GPRS::findContactByName(const char* searchName, int* index, char* number, ch
         if (sim900_check_readable() > 0) {
             sim900_clean_buffer(gprsBuffer, sizeof(gprsBuffer));
             sim900_read_buffer(gprsBuffer, sizeof(gprsBuffer), DEFAULT_TIMEOUT, DEFAULT_INTERCHAR_TIMEOUT);
-            // If the response contains an error, return -1
-            if (strstr(gprsBuffer, "ERROR") != NULL) {
+            
+            // Check if the response contains an error
+            if (strstr(gprsBuffer, "ERROR\r\n") != NULL) {
                 return -1;
             }
             
             // Process each line from the received buffer
             char* line = strtok(gprsBuffer, "\r\n");
             while (line != NULL) {
+                // Skip empty lines
+                if (strlen(line) == 0) {
+                    line = strtok(NULL, "\r\n");
+                    continue;
+                }
+                
                 if (strstr(line, "+CPBF:") != NULL) {
                     matchCount++;
                     if (!firstEntryFound) {
@@ -757,29 +765,24 @@ int GPRS::findContactByName(const char* searchName, int* index, char* number, ch
                             firstEntryFound = true;
                         }
                     }
+                } else if (strstr(line, "OK") != NULL) {
+                    okReceived = true;
                 }
-                // Process the next line in the buffer
                 line = strtok(NULL, "\r\n");
-            }
-            // If the response includes "OK", consider the command fully processed
-            if (strstr(gprsBuffer, "OK") != NULL) {
-                break;
             }
         }
     }
     
-    // If timeout occurred and "OK" was not found, return an error
-    if (millis() >= stopTime && strstr(gprsBuffer, "OK") == NULL) {
-        return -1;
-    }
-    
-    // Return a code based on the number of matching entries found
-    if (matchCount == 0) {
-        return 0;
-    } else if (matchCount == 1) {
-        return 1;
+    if (okReceived) {
+        if (matchCount == 0) {
+            return 0; // No matching entries
+        } else if (matchCount == 1) {
+            return 1; // One matching entry
+        } else {
+            return 2; // Multiple matching entries
+        }
     } else {
-        return 2;
+        return -1; // Unknown response
     }
 }
 
