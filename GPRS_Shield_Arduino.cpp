@@ -446,10 +446,11 @@ bool GPRS::getSubscriberNumber(char* number) {
 }
 
 bool GPRS::isCallActive(char* number, char* name) {
-    char gprsBuffer[64];  //46 is enough to see +CPAS: and CLCC:
+    char gprsBuffer[96];  //46 is enough to see +CPAS: and CLCC:
     char* p, *s;
     int i = 0;
 
+    sim900_flush_serial();
     sim900_send_cmd(F("AT+CPAS\r\n"));
     /*  Result code:
         0: ready
@@ -470,8 +471,8 @@ bool GPRS::isCallActive(char* number, char* name) {
         OK
     */
 
-    sim900_clean_buffer(gprsBuffer, 64);
-    sim900_read_string_until(gprsBuffer, 64, "OK", 2);
+    sim900_clean_buffer(gprsBuffer, 96);
+    sim900_read_string_until(gprsBuffer, 96, "OK", 2);
 
 
 
@@ -482,6 +483,7 @@ bool GPRS::isCallActive(char* number, char* name) {
             if (*s != '2') {
                 //3 or 4, let's go to check for the number
                 delay(5);
+                sim900_flush_serial();
                 sim900_send_cmd(F("AT+CLCC\r\n"));
                 /*
                     AT+CLCC --> 9
@@ -495,8 +497,8 @@ bool GPRS::isCallActive(char* number, char* name) {
                     OK
                 */
 
-                sim900_clean_buffer(gprsBuffer, 64);
-                sim900_read_string_until(gprsBuffer, 64, "OK", 2);
+                sim900_clean_buffer(gprsBuffer, 96);
+                sim900_read_string_until(gprsBuffer, 96, "OK", 2);
 
                 if (NULL != (s = strstr(gprsBuffer, "+CLCC:"))) {
                     //There is at least one CALL ACTIVE, get number
@@ -505,7 +507,7 @@ bool GPRS::isCallActive(char* number, char* name) {
                     p = strstr((char*)(s), "\""); //p is last character """
                     if (NULL != s) {
                         i = 0;
-                        while (s < p) {
+                        while (s < p && i < 15) {
                             number[i++] = *(s++);
                         }
                         number[i] = '\0';
@@ -514,14 +516,15 @@ bool GPRS::isCallActive(char* number, char* name) {
                     s = strstr((char*)(p + 1), "\"");
                     s = s + 1; // Move to start of name
                     p = strstr((char*)(s), "\""); // Find end of name
-                    if (p != NULL) {
+                    if (p != NULL && p != s) {
                         i = 0;
-                        while (s < p ) {
+                        while (s < p && i < 15) {
                             name[i++] = *(s++);
                         }
                         name[i] = '\0';
                     } else {
-                        name[0] = '\0'; // Failed to find end of name
+                        name[0] = '\0';
+                        return false;  // Falla explícita: nombre no parseado correctamente
                     }
                 } else {
                     return false;
