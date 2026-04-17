@@ -30,6 +30,7 @@
 */
 
 #include "sim900.h"
+#include <avr/wdt.h>    // [FT-S2-A] wdt_reset() dentro de wait loops bloqueantes
 
 
 SoftwareSerial* serialSIM900 = NULL;
@@ -185,7 +186,15 @@ boolean sim900_wait_for_resp(const char* resp, DataType type, unsigned int timeo
     unsigned long timerStart, prevChar;    //prevChar is the time when the previous Char has been read.
     timerStart = millis();
     prevChar = 0;
+    // [FT-S2-A] WDT-safe: el bucle puede permanecer bloqueante hasta 'timeout'
+    //   segundos (hasta 35s para CMGS). Sin wdt_reset() explícito se dispararía
+    //   el WDTO_8S cuando el modem responde con dribble de bytes por >8s.
+    unsigned long lastWdt = millis();
     while (1) {
+        if ((unsigned long)(millis() - lastWdt) >= 1000UL) {
+            wdt_reset();
+            lastWdt = millis();
+        }
         if (sim900_check_readable()) {
             char c = serialSIM900->read();
             DEBUG("-");
