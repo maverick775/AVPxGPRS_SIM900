@@ -64,6 +64,14 @@ void sim900_flush_serial() {
     }
 }
 
+void sim900_flush_serial_wdt() {
+    wdt_reset();
+    while (sim900_check_readable()) {
+        serialSIM900->read();
+        wdt_reset();
+    }
+}
+
 void sim900_read_buffer(char* buffer, int count, unsigned int timeout, unsigned int chartimeout) {
     int i = 0;
     unsigned long timerStart, prevChar;
@@ -187,7 +195,7 @@ boolean sim900_wait_for_resp(const char* resp, DataType type, unsigned int timeo
     timerStart = millis();
     prevChar = 0;
     // [FT-S2-A] WDT-safe: el bucle puede permanecer bloqueante hasta 'timeout'
-    //   segundos (hasta 35s para CMGS). Sin wdt_reset() explícito se dispararía
+    //   segundos (p. ej. 8s para CMGS). Sin wdt_reset() explícito se dispararía
     //   el WDTO_8S cuando el modem responde con dribble de bytes por >8s.
     unsigned long lastWdt = millis();
     while (1) {

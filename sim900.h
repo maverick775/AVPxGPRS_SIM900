@@ -49,6 +49,8 @@ void  sim900_init(void* uart_device, uint32_t baud);
 int   sim900_check_readable();
 int   sim900_wait_readable(int wait_time);
 void  sim900_flush_serial();
+/** Descarta RX con wdt_reset() por byte (buffer sucio largo / pre-CMGS). */
+void  sim900_flush_serial_wdt();
 void  sim900_read_buffer(char* buffer, int count,  unsigned int timeout = DEFAULT_TIMEOUT,
                          unsigned int chartimeout = DEFAULT_INTERCHAR_TIMEOUT);
 
