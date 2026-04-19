@@ -48,16 +48,7 @@ bool GPRS::init(void) {
         return false;
     }
 
-    //180822 Set SMS to text mode
-    if (!sim900_check_with_cmd(F("AT+CMGF=1\r\n"), "OK\r\n", CMD)) { // Set message mode to ASCII
-        return false;
-    }
-    //delay(500);	It is not necessary, as we have time before next command
-
-    // set New Message Indicator
-    if (!sim900_check_with_cmd(F("AT+CNMI=1,1,0,0,0\r\n"), "OK\r\n", CMD)) { // Set message mode to ASCII
-        return false;
-    }
+    // FT-S4: CMGF/CNMI/CPMS/CSCA solo via AVPModemManager_SIM800L::_applyConfig() o restoreSMSService().
 
     if (!checkSIMStatus()) {
         return false;
