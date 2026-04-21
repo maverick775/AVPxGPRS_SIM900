@@ -44,6 +44,14 @@ int sim900_check_readable() {
     return serialSIM900->available();
 }
 
+bool sim900_try_read_char(char* out) {
+    if (serialSIM900 == NULL || !sim900_check_readable()) {
+        return false;
+    }
+    *out = (char)serialSIM900->read();
+    return true;
+}
+
 int sim900_wait_readable(int wait_time) {
     unsigned long timerStart;
     int dataLen = 0;

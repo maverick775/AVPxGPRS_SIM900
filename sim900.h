@@ -47,6 +47,8 @@ enum DataType {
 
 void  sim900_init(void* uart_device, uint32_t baud);
 int   sim900_check_readable();
+/** FT-S5C: lee un byte de RX si hay datos (no bloqueante). */
+bool  sim900_try_read_char(char* out);
 int   sim900_wait_readable(int wait_time);
 void  sim900_flush_serial();
 /** Descarta RX con wdt_reset() por byte (buffer sucio largo / pre-CMGS). */
