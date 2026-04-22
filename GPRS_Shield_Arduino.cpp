@@ -79,6 +79,8 @@ void GPRS::powerReset(uint8_t pin) {
     delay(3000);
 }
 
+// TODO(integration/refactor): DEBT-09 — Ver comentario en GPRS_Shield_Arduino.h
+// (default args duplicados / extra qualification en declaraciones).
 bool GPRS::sendAT_CMD(const char* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3) {
     while (retryCount > 0) {
         // Send the custom AT command
@@ -97,6 +99,7 @@ bool GPRS::sendAT_CMD(const char* command, unsigned int timeout = DEFAULT_TIMEOU
     return false; // Response does not contain "OK"
 }
 
+// TODO(integration/refactor): DEBT-09 — Ver comentario en GPRS_Shield_Arduino.h.
 bool GPRS::sendAT_CMD(const __FlashStringHelper* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3) {
     while (retryCount > 0) {
         // Send the custom AT command

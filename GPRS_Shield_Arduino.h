@@ -94,6 +94,15 @@ class GPRS {
      *      true on success
      *      false on error
      */
+    // TODO(integration/refactor): DEBT-09 — Librería vendored AVPxGPRS_SIM900
+    // tiene declaraciones con extra qualification 'GPRS::' en el .h y default
+    // arguments duplicados en el .cpp. Ambos son ilegales en C++ estándar pero
+    // tolerados con -fpermissive. En el sprint de refactor:
+    //   1. Eliminar 'GPRS::' de las declaraciones en el .h (líneas 97 y 99).
+    //   2. Eliminar default args de las definiciones en el .cpp (líneas 82 y 100).
+    //   3. Verificar que ningún call-site externo dependa de los default args
+    //      (buscar sendAT_CMD( en *.cpp *.ino).
+    // RIESGO: bajo — AVR-GCC acepta el código hoy; el riesgo es al migrar toolchain.
     bool GPRS::sendAT_CMD(const char* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3);
     
     bool GPRS::sendAT_CMD(const __FlashStringHelper* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3);
