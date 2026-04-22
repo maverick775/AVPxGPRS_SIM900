@@ -48,7 +48,7 @@ bool GPRS::init(void) {
         return false;
     }
 
-    // FT-S4: CMGF/CNMI/CPMS/CSCA solo via AVPModemManager_SIM800L::_applyConfig() o restoreSMSService().
+    // FT-S4: CMGF/CNMI/CPMS/CSCA solo via SIM800Manager::_applyConfig() o restoreSMSService().
 
     if (!checkSIMStatus()) {
         return false;
