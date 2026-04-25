@@ -48,7 +48,16 @@ bool GPRS::init(void) {
         return false;
     }
 
-    // FT-S4: CMGF/CNMI/CPMS/CSCA solo via SIM800Manager::_applyConfig() o restoreSMSService().
+    // Set SMS to text mode
+    if (!sim900_check_with_cmd(F("AT+CMGF=1\r\n"), "OK\r\n", CMD)) { // Set message mode to ASCII
+        return false;
+    }
+    //delay(500);	It is not necessary, as we have time before next command
+
+    // set New Message Indicator
+    if (!sim900_check_with_cmd(F("AT+CNMI=1,1,0,0,0\r\n"), "OK\r\n", CMD)) { // Set message mode to ASCII
+        return false;
+    }
 
     if (!checkSIMStatus()) {
         return false;
@@ -182,7 +191,7 @@ bool GPRS::sendSMS(const char* number, const char* data) {
     // [FT-S2-A] Timeout extendido a 35s para tolerar Telcel congestionado.
     //   sim900_wait_for_resp() hace wdt_reset() interno cada 1s para mantener
     //   WDTO_8S satisfecho durante la espera.
-    return sim900_wait_for_resp("OK\r\n", CMD, 35U, 10000U);
+    return sim900_wait_for_resp("OK\r\n", CMD, 45U, 10000U);
 }
 
 char GPRS::isSMSunread() {
