@@ -188,10 +188,7 @@ bool GPRS::sendSMS(const char* number, const char* data) {
     sim900_send_cmd(data);
     delay(500);
     sim900_send_End_Mark();
-    // [FT-S2-A] Timeout extendido a 35s para tolerar Telcel congestionado.
-    //   sim900_wait_for_resp() hace wdt_reset() interno cada 1s para mantener
-    //   WDTO_8S satisfecho durante la espera.
-    return sim900_wait_for_resp("OK\r\n", CMD, 45U, 10000U);
+    return sim900_wait_for_resp("OK\r\n", CMD, 10U, 5000U);
 }
 
 char GPRS::isSMSunread() {
