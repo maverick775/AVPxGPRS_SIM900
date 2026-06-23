@@ -88,6 +88,49 @@ void GPRS::powerReset(uint8_t pin) {
     delay(3000);
 }
 
+// Timing validated with SIM800L_ResetPin_Diag.ino on AVP hardware (WDT-C1/C2):
+//   RST pin D9, active-LOW, first AT OK at ~3843 ms post-pulse.
+#define AVP_RST_PULSE_MS      150U   // active-LOW pulse width (ms)
+#define AVP_RST_BOOT_WAIT_MS  3000U  // post-pulse wait before first AT probe (ms)
+#define AVP_RST_PROBE_DELAY   500U   // interval between AT probes (ms)
+#define AVP_RST_MAX_PROBES      10U  // max AT probe attempts (~10 s total window)
+
+bool GPRS::hardwareReset(uint8_t rstPin, wdt_callback_t wdtCallback) {
+    // 1. Ensure pin is in idle-HIGH state before the pulse.
+    pinMode(rstPin, OUTPUT);
+    digitalWrite(rstPin, HIGH);
+    if (wdtCallback) wdtCallback();
+    delay(100U);
+
+    // 2. Active-LOW reset pulse (150 ms — below WDT threshold of 500 ms).
+    digitalWrite(rstPin, LOW);
+    delay(AVP_RST_PULSE_MS);
+
+    // 3. Release reset: pin MUST return to HIGH so the module can boot.
+    digitalWrite(rstPin, HIGH);
+    if (wdtCallback) wdtCallback();
+
+    // 4. Boot wait: 3000 ms in 500 ms increments for WDT safety.
+    //    Module first AT OK measured at ~3843 ms; probing starts at 3000 ms.
+    for (uint8_t i = 0U; i < (AVP_RST_BOOT_WAIT_MS / 500U); i++) {
+        delay(500U);
+        if (wdtCallback) wdtCallback();
+    }
+
+    // 5. AT probe window: up to AVP_RST_MAX_PROBES attempts, 500 ms apart.
+    for (uint8_t probe = 0U; probe < AVP_RST_MAX_PROBES; probe++) {
+        if (wdtCallback) wdtCallback();
+        // sim900_check_with_cmd: timeout param is in seconds (1 s), chartimeout in ms (500 ms).
+        if (sim900_check_with_cmd(F("AT\r\n"), "OK", CMD, 1U, AVP_RST_PROBE_DELAY)) {
+            return true;
+        }
+        delay(AVP_RST_PROBE_DELAY);
+        if (wdtCallback) wdtCallback();
+    }
+
+    return false;
+}
+
 // TODO(integration/refactor): DEBT-09 — Ver comentario en GPRS_Shield_Arduino.h
 // (default args duplicados / extra qualification en declaraciones).
 bool GPRS::sendAT_CMD(const char* command, unsigned int timeout = DEFAULT_TIMEOUT, uint8_t retryCount = 3) {
