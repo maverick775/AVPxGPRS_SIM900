@@ -301,6 +301,16 @@ char GPRS::isSMSunread() {
     return -1;
 }
 
+/*
+ * [EXCEPTION RG-11 / fix-sms-cmgr-body-integrity — 2026-07-22]
+ * Approved one-off thaw of frozen AVPxGPRS_SIM900 for GPRS::readSMS ONLY.
+ * Root cause H2 (docs/sprints/fix-sms-cmgr-body-integrity.plan.md): incomplete
+ * AT+CMGR frames were accepted as success, copying zero-fill NUL bytes into the
+ * SMS body. Fail-fast when the frame lacks an OK terminator.
+ * Retry/backoff lives in AVP-2SIM firmware — do NOT retry or delay here.
+ * This is NOT a general reopening of the library freeze (sim800-manager.mdc RG-11).
+ * Precedence: docs/DEBT_REGISTER.md (AVPxGPRS exception entry).
+ */
 bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, char* name, char* datetime) {
     /*  Response is like:
         AT+CMGR=2
@@ -333,6 +343,14 @@ bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, cha
     sim900_read_buffer(gprsBuffer, sizeof(gprsBuffer));
 
     if (NULL != (s = strstr(gprsBuffer, "+CMGR:"))) {
+        // Fail-fast (H2): interchar/total timeout can leave zero-fill NULs in the
+        // buffer. Without OK the frame is incomplete — never accept partial body.
+        if (strstr(s, "OK\r\n") == NULL) {
+            if (message != NULL && length > 0) {
+                message[0] = '\0';
+            }
+            return false;
+        }
         // Extract phone number string
         p = strstr(s, ",");
         p2 = p + 2; //We are in the first phone number character
@@ -375,12 +393,17 @@ bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, cha
         if (NULL != (s = strstr(s, "\r\n"))) {
             i = 0;
             p = s + 2;
-            while ((*p != '\r') && (i < length - 1)) {
+            // Stop on CR (end of body line) or NUL (truncated/pad) — never copy pad NULs.
+            while ((*p != '\r') && (*p != '\0') && (i < length - 1)) {
                 message[i++] = *(p++);
             }
             message[i] = '\0';
+            if (*p != '\r') {
+                return false;
+            }
+            return true;
         }
-        return true;
+        return false;
     }
     return false;
 }
