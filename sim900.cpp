@@ -57,6 +57,7 @@ int sim900_wait_readable(int wait_time) {
     int dataLen = 0;
     timerStart = millis();
     while ((unsigned long)(millis() - timerStart) < wait_time * 1000UL) {
+        wdt_reset();  // [WDT-PET] sim900_wait_readable wait loop
         delay(500);
         dataLen = sim900_check_readable();
         if (dataLen > 0) {
@@ -82,10 +83,15 @@ void sim900_flush_serial_wdt() {
 
 void sim900_read_buffer(char* buffer, int count, unsigned int timeout, unsigned int chartimeout) {
     int i = 0;
-    unsigned long timerStart, prevChar;
+    unsigned long timerStart, prevChar, lastWdt;
     timerStart = millis();
     prevChar = 0;
+    lastWdt = millis();
     while (1) {
+        if ((unsigned long)(millis() - lastWdt) >= 1000UL) {
+            wdt_reset();  // [WDT-PET] sim900_read_buffer wait loop
+            lastWdt = millis();
+        }
         while (sim900_check_readable()) {
             char c = serialSIM900->read();
             prevChar = millis();
@@ -118,7 +124,12 @@ char* sim900_read_string_until(char* buffer, uint16_t count, const char* pattern
 
     timerStart = millis();
     prevChar = 0;
+    unsigned long lastWdt = millis();
     while (1) {
+        if ((unsigned long)(millis() - lastWdt) >= 1000UL) {
+            wdt_reset();  // [WDT-PET] sim900_read_string_until wait loop
+            lastWdt = millis();
+        }
         if (serialSIM900->available()) {
             char c = serialSIM900->read();
             DEBUG(c);

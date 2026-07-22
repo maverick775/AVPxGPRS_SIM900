@@ -40,6 +40,11 @@
 
 #define HTTP_DEFAULT_PORT 80u
 
+/** Callback type for watchdog pet during long blocking operations.
+ *  Pass wdt_reset (from <avr/wdt.h>) when the WDT is active.
+ */
+typedef void (*wdt_callback_t)(void);
+
 enum Protocol {
     CLOSED = 0,
     TCP    = 1,
@@ -85,6 +90,19 @@ class GPRS {
 
     */
     void powerReset(uint8_t pin);
+
+    /** Hardware reset for SIM800L via active-LOW RST pin (AVP hardware: D9).
+     *  Sequence: HIGH pre-pulse → LOW 150 ms (reset) → HIGH (release, module boots) →
+     *  wait 3000 ms → probe AT up to 10 times with 500 ms intervals.
+     *  WDT-safe: calls wdtCallback during every blocking wait.
+     *
+     *  @param rstPin      Arduino pin connected to SIM800L RST (confirmed D9 on AVP HW).
+     *  @param wdtCallback Function to call for watchdog pet (e.g. wdt_reset). Pass nullptr
+     *                     if the WDT is not active.
+     *  @return true  if the module responds to AT after the reset sequence.
+     *  @return false if the module does not respond within the full probe window (~8 s).
+     */
+    bool hardwareReset(uint8_t rstPin, wdt_callback_t wdtCallback = nullptr);
 
     /** send AT command
      *  @param  command AT command
