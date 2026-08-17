@@ -40,6 +40,15 @@
 
 #define HTTP_DEFAULT_PORT 80u
 
+/** SIM800 +CLCC / +CMGR alpha field max (GSM charset, 1 byte/char). Not NAME_LENGTH. */
+#ifndef GSM_ALPHA_RAW_MAX_LEN
+#define GSM_ALPHA_RAW_MAX_LEN 15
+#endif
+/** Max chars copied into the application name dest (NAME_LENGTH-1 = 13 useful + NUL). */
+#ifndef GSM_ALPHA_APP_COPY_MAX
+#define GSM_ALPHA_APP_COPY_MAX 13
+#endif
+
 /** Callback type for watchdog pet during long blocking operations.
  *  Pass wdt_reset (from <avr/wdt.h>) when the WDT is active.
  */
@@ -167,6 +176,14 @@ class GPRS {
     */
     bool readSMS(int messageIndex, char* message, int length, char* phone, char *name, char* datetime);
 
+    /**
+     * HF27-05 / HF27-B: same as the 6-arg read, plus origin flag.
+     * @return true if the +CMGR frame was complete (transport). Never false solely because alpha is missing.
+     * @param registeredOrigin set true only if a real, complete, non-empty alpha (≤15 raw) was parsed.
+     */
+    bool readSMS(int messageIndex, char* message, int length, char* phone, char *name, char* datetime,
+                 bool* registeredOrigin);
+
     /** read SMS if getting a SMS message
         @param  buffer  buffer that get from GPRS module(when getting a SMS, GPRS module will return a buffer array)
         @param  message buffer used to get SMS message
@@ -233,6 +250,13 @@ class GPRS {
             false on error
     */
     bool isCallActive(char* number, char* name);
+
+    /**
+     * HF27-05 / HF27-B: same as the 2-arg call, plus origin flag.
+     * @return true if a real call is active and +CLCC parsed (transport). Never false solely because alpha is missing.
+     * @param registeredOrigin set true only if a real, complete, non-empty alpha (≤15 raw) was parsed.
+     */
+    bool isCallActive(char* number, char* name, bool* registeredOrigin);
 
     /** get DateTime from SIM900 (see AT command: AT+CLTS=1) as string
         @param

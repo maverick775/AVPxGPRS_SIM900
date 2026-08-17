@@ -30,9 +30,56 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include "GPRS_Shield_Arduino.h"
 
 GPRS* GPRS::inst = NULL;
+
+namespace {
+
+/** Copy alpha between quotes. No UB on NULL. Overflow (> rawCap) => false, no copy.
+ *  rawOut must have rawCap+1 bytes. */
+static bool _copyBoundedAlpha(const char* p2, const char* pClose,
+                              char* rawOut, uint8_t rawCap) {
+    if (rawOut != NULL && rawCap > 0U) {
+        rawOut[0] = '\0';
+    }
+    if (p2 == NULL || pClose == NULL || rawOut == NULL || rawCap == 0U) {
+        return false;
+    }
+    if (pClose <= p2) {
+        return false;
+    }
+    const uint16_t rawLen = (uint16_t)(pClose - p2);
+    if (rawLen > (uint16_t)rawCap) {
+        return false;
+    }
+    uint8_t n = 0U;
+    const char* s = p2;
+    while (s < pClose) {
+        rawOut[n++] = *s++;
+    }
+    rawOut[n] = '\0';
+    return (n > 0U);
+}
+
+static void _copyAlphaToAppName(char* name, const char* raw) {
+    if (name == NULL) {
+        return;
+    }
+    if (raw == NULL || raw[0] == '\0') {
+        name[0] = '\0';
+        return;
+    }
+    size_t nameLen = strlen(raw);
+    if (nameLen > (size_t)GSM_ALPHA_APP_COPY_MAX) {
+        nameLen = (size_t)GSM_ALPHA_APP_COPY_MAX;
+    }
+    strncpy(name, raw, nameLen);
+    name[nameLen] = '\0';
+}
+
+}  // namespace
 
 GPRS::GPRS(uint8_t tx, uint8_t rx, uint32_t baudRate): gprsSerial(tx, rx) {
     inst = this;
@@ -310,8 +357,11 @@ char GPRS::isSMSunread() {
  * Retry/backoff lives in AVP-2SIM firmware — do NOT retry or delay here.
  * This is NOT a general reopening of the library freeze (sim800-manager.mdc RG-11).
  * Precedence: docs/DEBT_REGISTER.md (AVPxGPRS exception entry).
+ * [EXCEPTION EXC-AVPx-02 / HF27-05 — 2026-08-17]
+ * Alpha parse only: bounded copy + registeredOrigin out-param. Return remains transport.
  */
-bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, char* name, char* datetime) {
+bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, char* name, char* datetime,
+                    bool* registeredOrigin) {
     /*  Response is like:
         AT+CMGR=2
 
@@ -321,20 +371,19 @@ bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, cha
         So we need (more or lees), 80 chars plus expected message length in buffer. CAUTION FREE MEMORY
     */
 
+    if (registeredOrigin != NULL) {
+        *registeredOrigin = false;
+    }
+    if (name != NULL) {
+        name[0] = '\0';
+    }
+
     int i = 0;
     char gprsBuffer[80 + length];
     //char cmd[16];
     char num[4];
     char* p, *p2, *s;
 
-    //180822 In the init function
-    //if(!sim900_check_with_cmd(F("AT+CMGF=1\r\n"), "OK\r\n", CMD)) { // Set message mode to ASCII
-    //    return false;
-    //}
-    //delay(1000);
-
-    //sprintf(cmd,"AT+CMGR=%d\r\n",messageIndex);
-    //sim900_send_cmd(cmd);
     sim900_send_cmd(F("AT+CMGR="));
     itoa(messageIndex, num, 10);
     sim900_send_cmd(num);
@@ -353,42 +402,47 @@ bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, cha
         }
         // Extract phone number string
         p = strstr(s, ",");
-        p2 = p + 2; //We are in the first phone number character
-        p = strstr((char*)(p2), "\"");
-        if (NULL != p) {
-            i = 0;
-            while (p2 < p) {
-                phone[i++] = *(p2++);
+        if (p != NULL) {
+            p2 = p + 2; //We are in the first phone number character
+            p = strstr((char*)(p2), "\"");
+            if (NULL != p && phone != NULL) {
+                i = 0;
+                while (p2 < p) {
+                    phone[i++] = *(p2++);
+                }
+                phone[i] = '\0';
             }
-            phone[i] = '\0';
-        }
-        // Extract phonebook name string
-        p = strstr((char*)(p2), ",");
-        p2 = p + 2; //We are in the first phonebook name character
-        p = strstr((char*)(p2), "\"");
-        // If there is no name in phonebook return false
-        if(p == p2){
-          return false;
-        }
-        if (NULL != p) {
-            i = 0;
-            while (p2 < p) {
-                name[i++] = *(p2++);
+            // Extract phonebook name (HF27-05): missing alpha is NOT a transport failure.
+            p = strstr((char*)(p2), ",");
+            if (p != NULL) {
+                p2 = p + 2;
+                p = strstr((char*)(p2), "\"");
+                char raw[GSM_ALPHA_RAW_MAX_LEN + 1];
+                raw[0] = '\0';
+                if (_copyBoundedAlpha(p2, p, raw, GSM_ALPHA_RAW_MAX_LEN)) {
+                    if (registeredOrigin != NULL) {
+                        *registeredOrigin = true;
+                    }
+                    _copyAlphaToAppName(name, raw);
+                }
             }
-            name[i] = '\0';
-        }
-        // Extract date time string
-        p = strstr((char*)(p2), ",");
-        p2 = p + 1;
-        p = strstr((char*)(p2), ",");
-        p2 = p + 2; //We are in the first date time character
-        p = strstr((char*)(p2), "\"");
-        if (NULL != p) {
-            i = 0;
-            while (p2 < p) {
-                datetime[i++] = *(p2++);
+            // Extract date time string
+            p = strstr((char*)(p2), ",");
+            if (p != NULL) {
+                p2 = p + 1;
+                p = strstr((char*)(p2), ",");
+                if (p != NULL) {
+                    p2 = p + 2;
+                    p = strstr((char*)(p2), "\"");
+                    if (NULL != p && datetime != NULL) {
+                        i = 0;
+                        while (p2 < p) {
+                            datetime[i++] = *(p2++);
+                        }
+                        datetime[i] = '\0';
+                    }
+                }
             }
-            datetime[i] = '\0';
         }
         if (NULL != (s = strstr(s, "\r\n"))) {
             i = 0;
@@ -406,6 +460,12 @@ bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, cha
         return false;
     }
     return false;
+}
+
+bool GPRS::readSMS(int messageIndex, char* message, int length, char* phone, char* name, char* datetime) {
+    bool origin = false;
+    const bool transportOk = readSMS(messageIndex, message, length, phone, name, datetime, &origin);
+    return transportOk && origin;
 }
 
 bool GPRS::readSMS(int messageIndex, char* message, int length) {
@@ -514,7 +574,14 @@ bool GPRS::getSubscriberNumber(char* number) {
     return false;
 }
 
-bool GPRS::isCallActive(char* number, char* name) {
+bool GPRS::isCallActive(char* number, char* name, bool* registeredOrigin) {
+    if (registeredOrigin != NULL) {
+        *registeredOrigin = false;
+    }
+    if (name != NULL) {
+        name[0] = '\0';
+    }
+
     char gprsBuffer[96];  //46 is enough to see +CPAS: and CLCC:
     char* p, *s;
     int i = 0;
@@ -543,8 +610,6 @@ bool GPRS::isCallActive(char* number, char* name) {
     sim900_clean_buffer(gprsBuffer, 96);
     sim900_read_string_until(gprsBuffer, 96, "OK", 2);
 
-
-
     if (NULL != (s = strstr(gprsBuffer, "+CPAS:"))) {
         s = s + 7;
         if (*s != '0') {
@@ -572,37 +637,53 @@ bool GPRS::isCallActive(char* number, char* name) {
                 if (NULL != (s = strstr(gprsBuffer, "+CLCC:"))) {
                     //There is at least one CALL ACTIVE, get number
                     s = strstr((char*)(s), "\"");
-                    s = s + 1;  //We are in the first phone number character
-                    p = strstr((char*)(s), "\""); //p is last character """
-                    if (NULL != s) {
+                    if (s == NULL) {
+                        return false;
+                    }
+                    s = s + 1;
+                    p = strstr((char*)(s), "\"");
+                    if (p == NULL) {
+                        return false;
+                    }
+                    if (number != NULL) {
                         i = 0;
                         while (s < p && i < 15) {
                             number[i++] = *(s++);
                         }
                         number[i] = '\0';
                     }
-                    // Continue reading buffer for contact's name
-                    s = strstr((char*)(p + 1), "\"");
-                    s = s + 1; // Move to start of name
-                    p = strstr((char*)(s), "\""); // Find end of name
-                    if (p != NULL && p != s) {
-                        i = 0;
-                        while (s < p && i < 15) {
-                            name[i++] = *(s++);
-                        }
-                        name[i] = '\0';
-                    } else {
-                        name[0] = '\0';
-                        return false;  // Falla explícita: nombre no parseado correctamente
+                    // Alpha: missing/empty/malformed => registeredOrigin=false, transport still true.
+                    const char* alphaOpen = strstr((char*)(p + 1), "\"");
+                    const char* alphaClose = NULL;
+                    if (alphaOpen != NULL) {
+                        alphaClose = strstr(alphaOpen + 1, "\"");
                     }
+                    char raw[GSM_ALPHA_RAW_MAX_LEN + 1];
+                    raw[0] = '\0';
+                    if (_copyBoundedAlpha(
+                            (alphaOpen != NULL) ? (alphaOpen + 1) : NULL,
+                            alphaClose,
+                            raw,
+                            GSM_ALPHA_RAW_MAX_LEN)) {
+                        if (registeredOrigin != NULL) {
+                            *registeredOrigin = true;
+                        }
+                        _copyAlphaToAppName(name, raw);
+                    }
+                    return true;
                 } else {
                     return false;
                 }
-                return true;
-            } 
+            }
         }
     }
     return false;
+}
+
+bool GPRS::isCallActive(char* number, char* name) {
+    bool origin = false;
+    const bool transportOk = isCallActive(number, name, &origin);
+    return transportOk && origin;
 }
 
 bool GPRS::getDateTime(char* buffer) {
