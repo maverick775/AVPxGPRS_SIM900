@@ -32,6 +32,10 @@
 #include "sim900.h"
 #include <avr/wdt.h>    // [FT-S2-A] wdt_reset() dentro de wait loops bloqueantes
 
+#if TEST_MODE
+extern void emiSilentDrainHook(void);
+#endif
+
 
 SoftwareSerial* serialSIM900 = NULL;
 
@@ -221,6 +225,9 @@ boolean sim900_wait_for_resp(const char* resp, DataType type, unsigned int timeo
         if ((unsigned long)(millis() - lastWdt) >= 1000UL) {
             wdt_reset();
             lastWdt = millis();
+#if TEST_MODE
+            emiSilentDrainHook();
+#endif
         }
         if (sim900_check_readable()) {
             char c = serialSIM900->read();
