@@ -68,3 +68,15 @@ Seeed is a hardware innovation platform for makers to grow inspirations into dif
 
 [![Analytics](https://ga-beacon.appspot.com/UA-46589105-3/GPRS_Shield)](https://github.com/igrigorik/ga-beacon)
 
+## Rollback tag `v2.6.8R-lib`
+
+`v2.6.8R-lib` is `0c958b656accc92512aee6f76ddf031ced3feed7`, the library tip at the
+AVP-2SIM `v2.6.8R` release (2026-06-09 14:02 -0600). It was still the tip of `master`
+at that time; the next commit (`0ab0db6`) landed the same day at 16:02 -0600, after the tag.
+
+Rebuild the `v2.6.8R` firmware from this exact commit, not from `master`. After the
+2026-09-26 fast-forward, `master` includes `d5d9e4c`, which calls
+`emiSilentDrainHook()` in `sim900.cpp`. That function does not exist in the
+`v2.6.8R` firmware sources, so a `TEST_MODE=1` rebuild against the new `master`
+fails to link.
+
